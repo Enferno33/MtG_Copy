@@ -17,25 +17,34 @@ public class Tile : MonoBehaviour
 
     private Vector2 position; // The grid position of the tile
 
-    // Path prefabs for different directions
     public GameObject pathUpPrefab;
     public GameObject pathDownPrefab;
     public GameObject pathLeftPrefab;
     public GameObject pathRightPrefab;
 
-    // List of possible enemies to spawn on this tile
     public List<EnemySpawnInfo> enemySpawnInfos = new List<EnemySpawnInfo>();
-    private List<GameObject> spawnedEnemies = new List<GameObject>(); // List of spawned enemies
+    private List<GameObject> spawnedEnemies = new List<GameObject>();
 
-    // Initialize the tile's paths; ensure backtracking path is always open
+    // Range for the number of enemies that can spawn on this tile
+    [Range(1, 10)] public int minEnemyCount = 1;
+    [Range(1, 10)] public int maxEnemyCount = 5;
+
+    private int currentTargetIndex = -1; // Tracks the index of the currently selected enemy
+
+    private void Update()
+    {
+        if (spawnedEnemies.Count > 0 && Input.GetKeyDown(KeyCode.Tab))
+        {
+            CycleTarget();
+        }
+    }
+
     public void InitializeTile(bool startingTile, Vector2 entryDirection)
     {
-        // Clear previously spawned enemies
         ClearEnemies();
 
         if (startingTile)
         {
-            // For the starting tile, only allow upward movement
             canMoveUp = true;
             canMoveDown = false;
             canMoveLeft = false;
@@ -43,20 +52,15 @@ public class Tile : MonoBehaviour
         }
         else
         {
-            // Randomize paths only once when the tile is first generated
             RandomizePaths();
-
-            // Ensure the path back to the previous tile is open based on entry direction
             if (entryDirection == Vector2.up) canMoveDown = true;
             else if (entryDirection == Vector2.down) canMoveUp = true;
             else if (entryDirection == Vector2.left) canMoveRight = true;
             else if (entryDirection == Vector2.right) canMoveLeft = true;
 
-            // Spawn a random number of enemies on this tile
             SpawnEnemies();
         }
 
-        // Spawn paths based on the available directions
         SpawnPaths();
     }
 
@@ -113,15 +117,12 @@ public class Tile : MonoBehaviour
     // Spawn a random number of enemies based on their spawn chances
     private void SpawnEnemies()
     {
-        // Random number of enemies to spawn (1 to 8) for this specific tile
-        int enemyCount = Random.Range(1, 9);
-
-        // Reset the spawnedEnemies list to ensure new enemies can be spawned
+        // Determine the number of enemies to spawn within the specified range
+        int enemyCount = Random.Range(minEnemyCount, maxEnemyCount + 1);
         spawnedEnemies.Clear();
 
         for (int i = 0; i < enemyCount; i++)
         {
-            // Select a random enemy prefab based on their spawn chance
             List<GameObject> eligibleEnemies = new List<GameObject>();
             foreach (var enemyInfo in enemySpawnInfos)
             {
@@ -133,11 +134,58 @@ public class Tile : MonoBehaviour
 
             if (eligibleEnemies.Count > 0)
             {
-                // Pick a random enemy prefab from the eligible list
                 GameObject selectedEnemyPrefab = eligibleEnemies[Random.Range(0, eligibleEnemies.Count)];
-                Vector3 enemyPosition = transform.position; // Spawn enemies at the center of the tile
+                Vector3 enemyPosition = transform.position;
                 GameObject spawnedEnemy = Instantiate(selectedEnemyPrefab, enemyPosition, Quaternion.identity, transform);
                 spawnedEnemies.Add(spawnedEnemy);
+            }
+        }
+
+        if (spawnedEnemies.Count > 0)
+        {
+            currentTargetIndex = 0;
+            HighlightTargetEnemy();
+        }
+    }
+
+    private void CycleTarget()
+    {
+        UnhighlightTargetEnemy();
+        currentTargetIndex = (currentTargetIndex + 1) % spawnedEnemies.Count;
+        HighlightTargetEnemy();
+    }
+
+    private void HighlightTargetEnemy()
+    {
+        if (currentTargetIndex >= 0 && currentTargetIndex < spawnedEnemies.Count)
+        {
+            spawnedEnemies[currentTargetIndex].GetComponent<Renderer>().material.color = Color.red;
+        }
+    }
+
+    private void UnhighlightTargetEnemy()
+    {
+        if (currentTargetIndex >= 0 && currentTargetIndex < spawnedEnemies.Count)
+        {
+            spawnedEnemies[currentTargetIndex].GetComponent<Renderer>().material.color = Color.white;
+        }
+    }
+
+    public bool AreAllEnemiesDefeated()
+    {
+        return spawnedEnemies.TrueForAll(enemy => enemy == null || !enemy.activeInHierarchy);
+    }
+    
+    public void EnemyDefeated(GameObject enemy)
+    {
+        if (spawnedEnemies.Contains(enemy))
+        {
+            spawnedEnemies.Remove(enemy);
+            Destroy(enemy);
+            if (spawnedEnemies.Count > 0)
+            {
+                currentTargetIndex = 0;
+                HighlightTargetEnemy();
             }
         }
     }

@@ -8,17 +8,33 @@ public class EnemyStats : MonoBehaviour
     public int defense = 5;      // Defense of the enemy
 
     private PlayerStats playerStats;       // Reference to the player's stats
+    private FightUIManager fightUIManager; // Reference to the FightUIManager
+    private EnemyUI enemyUI;               // Reference to the EnemyUI component for UI updates
 
     void Start()
     {
-        // Initialize the enemy's current health
-        currentHealth = maxHealth;
+        // Initialize health at the start
+        InitializeHealth();
 
-        // Find the PlayerStats component in the scene (assuming one player)
+        // Find necessary components in the scene
         playerStats = FindObjectOfType<PlayerStats>();
+        fightUIManager = FindObjectOfType<FightUIManager>();
+        enemyUI = GetComponentInChildren<EnemyUI>();
+
+        // Initialize EnemyUI with current stats, if available
+        if (enemyUI != null)
+        {
+            enemyUI.Initialize(this);
+        }
 
         // Start the automatic attack coroutine
         StartCoroutine(AutoAttack());
+    }
+
+    // Method to initialize the health of the enemy
+    public void InitializeHealth()
+    {
+        currentHealth = maxHealth;
     }
 
     // Coroutine to handle automatic attacks at fixed intervals
@@ -28,8 +44,8 @@ public class EnemyStats : MonoBehaviour
         {
             yield return new WaitForSeconds(3f); // Fixed 3 seconds interval
 
-            // Perform the attack if the player is still alive
-            if (playerStats != null && playerStats.currentHealth > 0)
+            // Perform the attack if the player is still alive and the enemy is in combat
+            if (playerStats != null && playerStats.currentHealth > 0 && fightUIManager.InCombat)
             {
                 Attack(playerStats);
                 Debug.Log(name + " attacks player for " + attackPower + " damage.");
@@ -37,16 +53,22 @@ public class EnemyStats : MonoBehaviour
         }
     }
 
-    // Method to take damage
+    // Method to take damage and update UI
     public void TakeDamage(int damage)
     {
         int damageTaken = Mathf.Max(damage - defense, 0); // Calculate damage after defense
         currentHealth -= damageTaken;
-        Debug.Log("Enemy took " + damageTaken + " damage. Current health: " + currentHealth);
+        Debug.Log(name + " took " + damageTaken + " damage. Current health: " + currentHealth);
+
+        // Update health in the EnemyUI if it exists
+        if (enemyUI != null)
+        {
+            enemyUI.UpdateHealth(currentHealth);
+        }
 
         if (currentHealth <= 0)
         {
-            currentHealth = 0; // Set health to 0 to avoid negative values
+            currentHealth = 0; // Ensure health doesn’t go negative
             Die();
         }
     }
@@ -60,18 +82,17 @@ public class EnemyStats : MonoBehaviour
     // Method called when the enemy's health reaches zero
     private void Die()
     {
-        Debug.Log("Enemy has died.");
-        // Handle enemy death (e.g., stop attacks, remove from game, drop loot)
+        Debug.Log(name + " has died.");
+
+        // Stop auto-attacks and notify FightUIManager of this enemy's death
         StopAllCoroutines(); // Stop auto-attacks when the enemy dies
 
-        // Instead of destroying the enemy immediately, signal to the FightUIManager that this enemy has died
-        FightUIManager fightUI = FindObjectOfType<FightUIManager>();
-        if (fightUI != null)
+        if (fightUIManager != null)
         {
-            fightUI.OnEnemyDeath(this); // Notify the FightUIManager that this enemy has died
+            //fightUIManager.OnEnemyDeath(this); // Notify FightUIManager of enemy death
         }
 
-        // Optionally add some delay before destroying the enemy GameObject
-        Destroy(gameObject, 1f); // Destroy the enemy GameObject after a short delay
+        // Optionally disable the enemy visually without destroying it immediately
+        gameObject.SetActive(false);
     }
 }

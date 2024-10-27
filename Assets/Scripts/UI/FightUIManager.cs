@@ -1,173 +1,227 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro; // Import TextMeshPro namespace
-using UnityEngine.SceneManagement; // Import SceneManagement for restarting the game
-using System.Collections.Generic; // Needed for List<>
+using TMPro;
+using UnityEngine.SceneManagement;
+using System.Collections.Generic;
 
 public class FightUIManager : MonoBehaviour
 {
-    public GameObject fightPanel;       // The fight UI panel
-    public Button attackButton;         // Attack button
-    public Button healButton;           // Heal button
-    public TMP_Text combatLogText;      // TMP_Text for combat log
-    public GameObject moveButtons;      // Parent GameObject for movement buttons
-    public Button closeFightUIButton;   // Button to close the fight UI
+    public GameObject fightPanel;
+    public Button attackButton;
+    public Button healButton;
+    public TMP_Text combatLogText;
+    public GameObject moveButtons;
+    public Button closeFightUIButton;
 
-    // UI elements for displaying player
-    public Image playerImage;           // Image component for displaying the player
-    public TMP_Text playerNameText;     // TMP_Text to display player's name
-    public TMP_Text playerHealthText;   // TMP_Text to display player's health
+    public Image playerImage;
+    public TMP_Text playerNameText;
+    public TMP_Text playerHealthText;
 
-    // UI elements for displaying enemies
-    public Image[] enemyImages = new Image[8]; // Array of Image components for displaying up to 8 enemies
-    public TMP_Text[] enemyNameTexts = new TMP_Text[8]; // Array of TMP_Text for enemy names
-    public TMP_Text[] enemyHealthTexts = new TMP_Text[8]; // Array of TMP_Text for enemy health
+    public GameObject enemyUIPrefab;
+    public Transform enemyUIContainer;
+    public Sprite bonesSprite;
 
-    // UI elements for death message and restart functionality
-    public TMP_Text deathMessageText;   // TMP_Text to display "You Died" message
-    public Button restartButton;        // Button to restart the game
+    public TMP_Text deathMessageText;
+    public Button restartButton;
 
-    private PlayerStats playerStats;    // Reference to the player's stats
-    private List<EnemyStats> enemyStatsList; // Reference to the list of enemies
-    private int currentEnemyIndex = 0;  // Track which enemy is currently being fought
-    private CharacterMovement characterMovement; // Reference to the CharacterMovement script
+    private PlayerStats playerStats;
+    private List<EnemyStats> enemyStatsList;
+    private List<GameObject> enemyUIElements = new List<GameObject>();
+    private int currentEnemyIndex = 0;
+    private CharacterMovement characterMovement;
 
     public bool InCombat;
 
-    public GameObject enemyPrefab; // Prefab for the enemy
+    public GameObject enemyPrefab;
 
     void Start()
     {
-        // Assign button listeners
         attackButton.onClick.AddListener(OnAttackButtonClicked);
         healButton.onClick.AddListener(OnHealButtonClicked);
         restartButton.onClick.AddListener(OnRestartButtonClicked);
         closeFightUIButton.onClick.AddListener(CloseFightUI);
 
-        // Initially hide the fight panel, death message, and restart button
         fightPanel.SetActive(false);
         deathMessageText.gameObject.SetActive(false);
         restartButton.gameObject.SetActive(false);
         closeFightUIButton.gameObject.SetActive(false);
 
-        // Find the CharacterMovement component on the player
         characterMovement = FindObjectOfType<CharacterMovement>();
+
+         // Clear enemy UI container at the start of the game
+        ClearEnemyUIContainer();
     }
 
-    // Method to start the fight and spawn enemies
-    public void StartFight(PlayerStats player)
+    // Method to clear the enemyUIContainer
+    private void ClearEnemyUIContainer()
     {
-        int enemyCount = Random.Range(1, 9); // Spawn between 1 and 8 enemies
-        enemyStatsList = new List<EnemyStats>(); // Initialize enemy stats list
+        foreach (Transform child in enemyUIContainer)
+        {
+            Destroy(child.gameObject); // Destroy each child GameObject
+        }
+        enemyUIElements.Clear(); // Clear the list to ensure consistency
+        Debug.Log("Cleared enemy UI container.");
+    }
 
-        // Clear previous enemy images and texts
+    void Update()
+    {
+        if (InCombat && Input.GetKeyDown(KeyCode.Tab))
+        {
+            CycleEnemyTarget();
+        }
+    }
+
+    public void PreStartFight(PlayerStats player)
+    {
+        ClearEnemyUIContainer();
+
+        int enemyCount = Random.Range(1, 9);
+        enemyStatsList = new List<EnemyStats>();
+        enemyUIElements = new List<GameObject>(); // Ensure it's cleared before use
+
         ResetEnemyUI();
 
         for (int i = 0; i < enemyCount; i++)
         {
-            GameObject enemyGO = Instantiate(enemyPrefab); // Instantiate enemy prefab
-            EnemyStats enemyStats = enemyGO.GetComponent<EnemyStats>(); // Get the EnemyStats component
-            enemyStatsList.Add(enemyStats); // Add to the list of enemies
+            GameObject enemyGO = Instantiate(enemyPrefab);
+            EnemyStats enemyStats = enemyGO.GetComponent<EnemyStats>();
 
-            // Update the UI for this enemy
-            if (i < enemyImages.Length) // Ensure we don't exceed the array length
+            // Ensure health initialization here
+            enemyStats.InitializeHealth();
+            enemyStatsList.Add(enemyStats);
+
+            GameObject enemyUI = Instantiate(enemyUIPrefab, enemyUIContainer);
+            if (enemyUI != null)
             {
-                enemyImages[i].gameObject.SetActive(true); // Show the enemy image
-                enemyNameTexts[i].gameObject.SetActive(true); // Show the enemy name text
-                enemyHealthTexts[i].gameObject.SetActive(true); // Show the enemy health text
+                enemyUIElements.Add(enemyUI);
+                Debug.Log($"Instantiated enemy UI prefab for enemy {i}");
+                UpdateEnemyUI(i);
+            }
+            else
+            {
+                Debug.LogError("Failed to instantiate enemyUIPrefab. Please check if the prefab is assigned.");
             }
         }
 
-        // Initialize fight with the player
         StartFight(player, enemyStatsList);
+
+        // Optionally, delay the full update to ensure all data is loaded
+        Invoke(nameof(UpdateAllEnemyUI), 0.1f);  // Slight delay to allow full initialization
+    }
+    private void UpdateAllEnemyUI()
+    {
+        for (int i = 0; i < enemyStatsList.Count; i++)
+        {
+            UpdateEnemyUI(i);  // Update each enemy UI after full initialization
+        }
+        Debug.Log("All enemy UIs updated with finalized health.");
     }
 
-    // Method to initialize and show the fight UI for multiple enemies
+    private void UpdateEnemyUI(int index)
+    {
+        if (index < enemyStatsList.Count && index < enemyUIElements.Count)
+        {
+            EnemyStats enemyStats = enemyStatsList[index];
+            GameObject enemyUI = enemyUIElements[index];
+
+            Image enemyImage = enemyUI.transform.Find("EnemyImage").GetComponent<Image>();
+            TMP_Text enemyNameText = enemyUI.transform.Find("EnemyName").GetComponent<TMP_Text>();
+            TMP_Text enemyHealthText = enemyUI.transform.Find("EnemyHealth").GetComponent<TMP_Text>();
+
+            // Set image to bones sprite if enemy is dead
+            if (enemyStats.currentHealth <= 0)
+            {
+                enemyImage.sprite = bonesSprite;
+            }
+            else
+            {
+                enemyImage.sprite = enemyStats.GetComponent<SpriteRenderer>().sprite;
+            }
+
+            enemyNameText.text = enemyStats.name;
+            enemyHealthText.text = "Health: " + enemyStats.currentHealth;
+        }
+    }
+
+
     public void StartFight(PlayerStats player, List<EnemyStats> enemies)
     {
         playerStats = player;
         enemyStatsList = enemies;
-        currentEnemyIndex = 0; // Start with the first enemy
+        currentEnemyIndex = 0;
         InCombat = true;
+        
 
-        // Update the UI with player and enemy details
         UpdatePlayerUI();
-        UpdateEnemyUI();
-
-        // Show the fight UI and hide movement buttons
+        for (int i = 0; i < enemyStatsList.Count; i++)
+        {
+            UpdateEnemyUI(i); // Ensure 'i' is passed as an argument to UpdateEnemyUI
+        }
         fightPanel.SetActive(true);
         moveButtons.SetActive(false);
 
-        // Log initial combat message
         UpdateCombatLog("A wild " + enemyStatsList[currentEnemyIndex].name + " appears!");
+        HighlightEnemy(currentEnemyIndex);
     }
 
     private void UpdatePlayerUI()
     {
         if (playerStats != null)
         {
-            playerImage.sprite = playerStats.GetComponent<SpriteRenderer>().sprite; // Display player sprite
-            playerNameText.text = playerStats.name; // Display player name
-            playerHealthText.text = "Health: " + playerStats.currentHealth; // Display player health
-        }
-    }
-
-    private void UpdateEnemyUI()
-    {
-        for (int i = 0; i < enemyStatsList.Count; i++)
-        {
-            if (i < enemyStatsList.Count)
-            {
-                var currentEnemy = enemyStatsList[i];
-                if (currentEnemy != null && currentEnemy.gameObject != null) // Check if the enemy still exists
-                {
-                    enemyImages[i].sprite = currentEnemy.GetComponent<SpriteRenderer>().sprite;
-                    enemyNameTexts[i].text = currentEnemy.name;
-                    enemyHealthTexts[i].text = "Health: " + currentEnemy.currentHealth;
-                }
-            }
+            playerImage.sprite = playerStats.GetComponent<SpriteRenderer>().sprite;
+            playerNameText.text = playerStats.name;
+            playerHealthText.text = "Health: " + playerStats.currentHealth;
         }
     }
 
     private void ResetEnemyUI()
     {
-        foreach (var image in enemyImages)
+        foreach (GameObject enemyUI in enemyUIElements)
         {
-            image.gameObject.SetActive(false); // Hide all enemy images
+            Destroy(enemyUI);
         }
+        enemyUIElements.Clear();
+    }
 
-        foreach (var text in enemyNameTexts)
+    private void CycleEnemyTarget()
+    {
+        UnhighlightEnemy(currentEnemyIndex);
+        currentEnemyIndex = (currentEnemyIndex + 1) % enemyStatsList.Count;
+        HighlightEnemy(currentEnemyIndex);
+    }
+
+    private void HighlightEnemy(int index)
+    {
+        if (index < enemyUIElements.Count)
         {
-            text.text = ""; // Clear enemy names
+            enemyUIElements[index].transform.Find("EnemyImage").GetComponent<Image>().color = Color.red;
         }
+    }
 
-        foreach (var healthText in enemyHealthTexts)
+    private void UnhighlightEnemy(int index)
+    {
+        if (index < enemyUIElements.Count)
         {
-            healthText.text = ""; // Clear health texts
+            enemyUIElements[index].transform.Find("EnemyImage").GetComponent<Image>().color = Color.white;
         }
     }
 
     private void OnAttackButtonClicked()
     {
-        if (playerStats != null && enemyStatsList.Count > currentEnemyIndex)
+        if (playerStats != null && currentEnemyIndex < enemyStatsList.Count)
         {
             EnemyStats currentEnemy = enemyStatsList[currentEnemyIndex];
-
-            // Player attacks the current enemy
             playerStats.Attack(currentEnemy);
             UpdateCombatLog("Player attacks " + currentEnemy.name + " for " + playerStats.attackPower + " damage.");
-            UpdateEnemyHealthUI(); // Update enemy health display
+            UpdateEnemyUI(currentEnemyIndex);
 
-            // Check if the current enemy is still alive
             if (currentEnemy.currentHealth > 0)
             {
-                // Enemy attacks back
                 currentEnemy.Attack(playerStats);
                 UpdateCombatLog(currentEnemy.name + " attacks player for " + currentEnemy.attackPower + " damage.");
-                UpdatePlayerHealthUI(); // Update player health display
+                UpdatePlayerHealthUI();
             }
 
-            // Check the combat result
             CheckCombatResult();
         }
     }
@@ -176,50 +230,36 @@ public class FightUIManager : MonoBehaviour
     {
         if (playerStats != null)
         {
-            // Heal the player (for example, heal 20 health points)
             playerStats.currentHealth = Mathf.Min(playerStats.currentHealth + 20, playerStats.maxHealth);
             UpdateCombatLog("Player heals for 20 health. Current health: " + playerStats.currentHealth);
-            UpdatePlayerHealthUI(); // Update player health display
+            UpdatePlayerHealthUI();
 
-            // Enemy's turn after healing
             if (enemyStatsList[currentEnemyIndex].currentHealth > 0)
             {
                 enemyStatsList[currentEnemyIndex].Attack(playerStats);
                 UpdateCombatLog(enemyStatsList[currentEnemyIndex].name + " attacks player for " + enemyStatsList[currentEnemyIndex].attackPower + " damage.");
-                UpdatePlayerHealthUI(); // Update player health display
+                UpdatePlayerHealthUI();
             }
 
-            // Check the combat result
             CheckCombatResult();
         }
     }
 
     private void UpdateCombatLog(string message)
     {
-        combatLogText.text += message + "\n"; // Update TMP text
+        combatLogText.text += message + "\n";
     }
 
     private void ClearCombatLog()
     {
-        combatLogText.text = ""; // Clear the TMP text
+        combatLogText.text = "";
     }
 
     private void UpdatePlayerHealthUI()
     {
         if (playerHealthText != null && playerStats != null)
         {
-            playerHealthText.text = "Health: " + playerStats.currentHealth; // Update health display
-        }
-    }
-
-    private void UpdateEnemyHealthUI()
-    {
-        for (int i = 0; i < enemyStatsList.Count; i++)
-        {
-            if (enemyHealthTexts[i] != null)
-            {
-                enemyHealthTexts[i].text = "Health: " + enemyStatsList[i].currentHealth; // Update health display
-            }
+            playerHealthText.text = "Health: " + playerStats.currentHealth;
         }
     }
 
@@ -228,65 +268,48 @@ public class FightUIManager : MonoBehaviour
         if (playerStats.currentHealth <= 0)
         {
             UpdateCombatLog("Player has been defeated!");
-            ShowDeathMessage(); // Show the "You Died" message and restart button
+            ShowDeathMessage();
+        }
+        else if (enemyStatsList.TrueForAll(enemy => enemy.currentHealth <= 0))
+        {
+            UpdateCombatLog("All enemies have been defeated!");
+            EndFight();
         }
         else if (enemyStatsList[currentEnemyIndex].currentHealth <= 0)
         {
             UpdateCombatLog(enemyStatsList[currentEnemyIndex].name + " has been defeated!");
-
-            currentEnemyIndex++; // Move to the next enemy
-
-            // Check if there are more enemies to fight
-            if (currentEnemyIndex < enemyStatsList.Count)
-            {
-                UpdateEnemyUI(); // Update the UI with the new enemy
-                UpdateCombatLog("A wild " + enemyStatsList[currentEnemyIndex].name + " appears!");
-            }
-            else
-            {
-                // All enemies are defeated
-                EndFight(); // End the fight after all enemies are defeated
-            }
+            CycleEnemyTarget();
         }
     }
 
     private void ShowDeathMessage()
     {
         deathMessageText.gameObject.SetActive(true);
-        deathMessageText.text = "You Died"; // Display death message
-        restartButton.gameObject.SetActive(true); // Show restart button
+        deathMessageText.text = "You Died";
+        restartButton.gameObject.SetActive(true);
 
-        // Hide other UI elements related to combat
         attackButton.gameObject.SetActive(false);
         healButton.gameObject.SetActive(false);
     }
 
     private void OnRestartButtonClicked()
     {
-        // Clear combat log before restarting
         ClearCombatLog();
-
-        // Reload the current scene to restart the game
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-    }
-
-    public void OnEnemyDeath(EnemyStats enemy)
-    {
-        EndFight();
     }
 
     private void EndFight()
     {
-        ClearCombatLog(); // Clear combat log when the fight ends
-        fightPanel.SetActive(false);  // Hide the fight UI
-        moveButtons.SetActive(true);  // Show movement buttons again
+        ClearCombatLog();
+        fightPanel.SetActive(false);
+        moveButtons.SetActive(true);
         InCombat = false;
 
         foreach (var enemy in enemyStatsList)
         {
             if (enemy != null && enemy.gameObject != null)
             {
-                Destroy(enemy.gameObject); // Destroy any remaining enemy game objects
+                Destroy(enemy.gameObject);
             }
         }
 
@@ -295,14 +318,14 @@ public class FightUIManager : MonoBehaviour
             characterMovement.MoveToTileCenterIfNeeded();
         }
 
-        closeFightUIButton.gameObject.SetActive(true); // Show the close button
+        closeFightUIButton.gameObject.SetActive(true);
     }
 
     private void CloseFightUI()
     {
         fightPanel.SetActive(false);
         moveButtons.SetActive(true);
-        closeFightUIButton.gameObject.SetActive(false); // Hide the close button
-        ClearCombatLog(); // Clear combat log 
+        closeFightUIButton.gameObject.SetActive(false);
+        ClearCombatLog();
     }
 }

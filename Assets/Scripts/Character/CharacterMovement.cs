@@ -238,7 +238,8 @@ public class CharacterMovement : MonoBehaviour
 
             if (enemyStatsList.Count > 0 && playerStats != null)
             {
-                fightUIManager.StartFight(playerStats, enemyStatsList);
+                fightUIManager.PreStartFight(playerStats);
+                //fightUIManager.StartFight(playerStats, enemyStatsList);
             }
         }
     }

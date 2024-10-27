@@ -122,6 +122,8 @@ MonoBehaviour:
   - enemyPrefab: {fileID: 3322593307392697192, guid: 71783841bb8d52d4fb89a9d173b304bb,
       type: 3}
     spawnChance: 85.9
+  minEnemyCount: 1
+  maxEnemyCount: 8
 --- !u!61 &8463303072192114154
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -188,6 +190,8 @@ MonoBehaviour:
   pathLeftPrefab: {fileID: 0}
   pathRightPrefab: {fileID: 0}
   enemySpawnInfos: []
+  minEnemyCount: 1
+  maxEnemyCount: 5
 --- !u!1 &560938620586068683
 GameObject:
   m_ObjectHideFlags: 0
