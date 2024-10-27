@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 1194695741954265930}
   - component: {fileID: 9079569497804742405}
   - component: {fileID: 8463303072192114154}
-  - component: {fileID: 8681647822607996066}
   m_Layer: 0
   m_Name: Tile
   m_TagString: Untagged
@@ -169,29 +168,6 @@ BoxCollider2D:
   serializedVersion: 2
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &8681647822607996066
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 114314271130277532}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eefb53a0ca79f884d8bb6f5fb20cb86f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  canMoveUp: 0
-  canMoveDown: 0
-  canMoveLeft: 0
-  canMoveRight: 0
-  pathUpPrefab: {fileID: 0}
-  pathDownPrefab: {fileID: 0}
-  pathLeftPrefab: {fileID: 0}
-  pathRightPrefab: {fileID: 0}
-  enemySpawnInfos: []
-  minEnemyCount: 1
-  maxEnemyCount: 5
 --- !u!1 &560938620586068683
 GameObject:
   m_ObjectHideFlags: 0
