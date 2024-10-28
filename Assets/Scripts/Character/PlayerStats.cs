@@ -7,6 +7,8 @@ public class PlayerStats : MonoBehaviour
     public int attackPower = 20; // Attack power of the player
     public int defense = 10;     // Defense of the player
 
+    public int fireBallAttack = 1;
+
     void Start()
     {
         // Initialize the player's current health
@@ -32,6 +34,14 @@ public class PlayerStats : MonoBehaviour
         enemy.TakeDamage(attackPower);
         Debug.Log("Player attacks enemy for " + attackPower + " damage.");
     }
+
+    // Method to attack an enemy withy fire ball
+    public void FireBallAttack(EnemyStats enemy)
+    {
+        enemy.TakeDamage(fireBallAttack);
+        Debug.Log("Player attacks enemy for " + fireBallAttack + " damage.");
+    }
+
 
     // Method called when the player's health reaches zero
     private void Die()
